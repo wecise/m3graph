@@ -1,7 +1,8 @@
 <template>
     <div class="container">
-        <SearchBar></SearchBar>
-        <GraphHandler :model="model" v-if="model && model.length>0"></GraphHandler>
+        <SearchBar ref="searchBarRef"></SearchBar>
+        <GraphHandler :model="model"
+            @control-show="onControlShow"></GraphHandler>
     </div>
 </template>
 
@@ -17,7 +18,12 @@ export default {
     components:{
         GraphHandler,
         SearchBar
-    }  
+    },
+    methods:{
+        onControlShow(data){
+            this.$refs.searchBarRef.control.show = data;
+        }
+    }
 }
 </script>
 

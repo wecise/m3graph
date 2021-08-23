@@ -1,5 +1,6 @@
 <template>
-  <el-container >
+
+  <el-container ref="container">
     <el-header style="height:40px;line-height:40px;padding:0px;text-align:right;">
         <el-popover
             placement="left"
@@ -66,6 +67,7 @@
         v-show="graph.control.outline.show">
     </div>
   </el-container>
+
 </template>
 
 <script>
@@ -86,7 +88,10 @@ export default {
     return {
       graph: {
             editor:null,
-            data: null,
+            data: {
+                nodes: [],
+                edges: []
+            },
             control:{
                 ifIcon: true,
                 outline: {
@@ -172,7 +177,7 @@ export default {
   watch: {
         model:{
           handler(){
-              this.initData();
+              //this.initData();
           },
           deep: true
         },
@@ -198,18 +203,20 @@ export default {
         },
   },
   created(){
-    this.initData();
+    //this.initData();
     this.init();
   },
   mounted(){
       this.eventHub.$on("graph-position",(v)=>{
           this.onCellPosition(v.row,v.hFlag,v.vFlag);
       })
+
+      this.initGraph();
   },
   methods: {
     // 初始化
     init(){
-        this.m3.callFS("/matrix/m3event/graph/edges.js",null).then( (rtn)=>{
+        this.m3.callFS("/matrix/m3graph/edges.js",null).then( (rtn)=>{
             this.graph.edges.list = rtn.message;
         } );
 
@@ -228,29 +235,18 @@ export default {
 
         // Enables snapping waypoints to terminals
         mxEdgeHandler.prototype.snapToTerminals = true;
+
     },
     // 加载图数据
     initData(){
         
         if(_.isEmpty(this.model)) {
-            this.onReload();
             return false;
-        } else {
-            
-            this.m3.dfsRead({parent:"/script/matrix/m3event/graph", name:"config.json"}).then( rtn=>{
-                let matchTemplate = _.template(JSON.parse(rtn).match);
-                let match = matchTemplate({ids: this.model.join("','")});
-                let param = encodeURIComponent( match );
-
-                this.m3.callFS("/matrix/m3event/graph/graphService.js", param).then( res=>{
-                    this.graph.data = res.message[0].graph;
-                    this.onReload();
-                } )
-            })
         }
     },
     // 初始化图板
     initGraph(){
+        
         this.graph.editor = new mxEditor();
         this.graph.editor.setGraphContainer(this.$refs.graphContainer.$el);
         let graph = this.graph.editor.graph;
@@ -340,6 +336,104 @@ export default {
 
         // 初始化鹰眼视图
         this.onInitOutline(graph);
+
+        // 监听拖拽事件
+        let container = this.$refs.graphContainer.$el;
+        mxEvent.addListener(container, 'dragover', (evt)=>{
+            if (graph.isEnabled()){
+                evt.stopPropagation();
+                evt.preventDefault();
+            }
+        });
+        // 监听拖入事件
+        mxEvent.addListener(container, 'drop', (evt)=>{
+            
+            if (graph.isEnabled()){
+                evt.stopPropagation();
+                evt.preventDefault();
+
+                // Gets drop location point for vertex
+                var pt = mxUtils.convertPoint(graph.container, mxEvent.getClientX(evt), mxEvent.getClientY(evt));
+                var tr = graph.view.translate;
+                var scale = graph.view.scale;
+                var x = pt.x / scale - tr.x;
+                var y = pt.y / scale - tr.y;
+                
+                // Converts local entity to graph cell
+                let addCellToGraph = (items)=>{
+                    
+                    graph.getModel().beginUpdate();
+
+                    try{
+
+                        graph.getModel();
+                        let parent = graph.getDefaultParent();
+
+                        _.forEach(items,(v)=>{
+                            
+                            let cell = graph.getModel().getCell(v.id);
+
+                            if(cell){
+                                this.$message({
+                                    type: "info",
+                                    message: "已有该实体"
+                                })
+                                return;
+                            }
+
+                            let type = v.icon || 'matrix';
+
+                            // 可设置默认显示属性
+                            let name =  '';
+                            
+                            try{
+                                if(window.URL_PARAMS_GRAPH){
+                                    name = v[window.URL_PARAMS_GRAPH.title];
+                                } else {
+                                    name = v[this.model.graph.default.title];
+                                }
+                            } catch(err){
+                                name = v["id"];
+                            }
+
+                            let imageUrl = this.imageRenderHandler(type);
+
+                            if(this.graph.control.ifIcon){
+                                if(this.checkImgExists(`${type}.png`)){
+                                    cell = graph.insertVertex(parent, v.id, name, x, y, 60, 60,`shape=image;html=1;image=${imageUrl};verticalLabelPosition=bottom;verticalAlign=top;`);
+                                } else {
+                                    cell = graph.insertVertex(parent, v.id, name, x, y, 50, 50,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
+                                }    
+                            } 
+                            // shape渲染
+                            else {
+                                cell = graph.insertVertex(parent, v.id, name, x, y, 50, 50,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
+                            }
+
+                            // 定位到cell
+                            setTimeout(()=>{
+                                graph.scrollCellToVisible(cell);
+                                graph.setSelectionCell(cell);
+                            },1000)
+
+                        })
+                    
+                        
+                    } catch(err){
+                        console.error(err);
+                    } finally {
+                        graph.getModel().endUpdate();
+
+                        this.$emit("control-show",false);
+                    }
+                };
+    
+                var items = [JSON.parse(evt.dataTransfer.getData("Text"))];
+
+                addCellToGraph(items);
+            }
+        });
+
     },
     // 滚轮缩放事件监听
     addScrollListener(graph){
@@ -392,7 +486,7 @@ export default {
     },
     checkImgExists(){
         //let term = {parent:"/assets/images/entity/png", name:name};
-        return true;//fsHandler.callFsJScript("/matrix/graph/checkHaveFile.js", encodeURIComponent(JSON.stringify(term))).message;
+        return true;//fsHandler.callFsJScript("/matrix/m3graph/checkHaveFile.js", encodeURIComponent(JSON.stringify(term))).message;
     },  
     // 渲染图片来源
     imageRenderHandler(icon) {
@@ -720,35 +814,35 @@ export default {
                 // 绘制节点
                 _.forEach(allNodes,(v)=>{
 
-                    let _type = v._icon || 'matrix';
+                    let type = v._icon || 'matrix';
 
                     // 可设置默认显示属性
-                    let _name =  '';
+                    let name =  '';
 
                     try{
                         if(window.URL_PARAMS_GRAPH){
-                            _name = v[window.URL_PARAMS_GRAPH.title];
+                            name = v[window.URL_PARAMS_GRAPH.title];
                         } else {
-                            _name = v[this.model.graph.default.title];
+                            name = v[this.model.graph.default.title];
                         }
                     } catch(err){
-                        _name = v["id"];
+                        name = v["id"];
                     }
 
                     // 选择节点渲染模式：icon/shape
-                    let imageUrl = this.imageRenderHandler(_type);
+                    let imageUrl = this.imageRenderHandler(type);
 
                     // icon渲染
                     if(this.graph.control.ifIcon){
-                        if(this.checkImgExists(`${_type}.png`)){
-                            graph.insertVertex(parent, v.id, _name, 50, 50, 60, 60,`shape=image;html=1;image=${imageUrl};verticalLabelPosition=bottom;verticalAlign=top;`);
+                        if(this.checkImgExists(`${type}.png`)){
+                            graph.insertVertex(parent, v.id, name, 50, 50, 60, 60,`shape=image;html=1;image=${imageUrl};verticalLabelPosition=bottom;verticalAlign=top;`);
                         } else {
-                            graph.insertVertex(parent, v.id, _name, 50, 50, 50, 50,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
+                            graph.insertVertex(parent, v.id, name, 50, 50, 50, 50,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
                         }    
                     } 
                     // shape渲染
                     else {
-                        graph.insertVertex(parent, v.id, _name, 50, 50, 50, 50,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
+                        graph.insertVertex(parent, v.id, name, 50, 50, 50, 50,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
                     }
                 })
                 
@@ -801,7 +895,7 @@ export default {
     },
     // 图分析 - 子图
     loadSubGraph(node){
-        
+
         let term = "";
         let edgeStr = _.isEmpty(node.edge) ? node.edge : `:${node.edge}`;
 
@@ -811,8 +905,10 @@ export default {
             term = `match ('${node.node.id}') <- [${edgeStr}*${node.step}] - ()`;
         }
 
-        this.m3.callFS("/matrix/graph/graph_service.js", encodeURIComponent(term)).then( val=>{
-            let rtn = val.message[0].graph;
+        this.m3.callFS("/matrix/m3graph/graphService.js", encodeURIComponent(term)).then( res=>{
+            
+            let rtn = res.message[0].graph;
+            console.log(1111,rtn)
 
             let allNodes = _.concat([],rtn.nodes);
             let allEdges = _.concat([],rtn.edges);
@@ -870,7 +966,7 @@ export default {
                 let vars = {};
                 let submenuBsearch = null;
                 let submenuEsearch = null;
-                this.m3.callFS("/matrix/graph/getEdgesByClass.js",encodeURIComponent(id)).then(rtn=>{
+                this.m3.callFS("/matrix/m3graph/getEdgesByClass.js",encodeURIComponent(id)).then(rtn=>{
                     
                     menu.addSeparator();
 
@@ -945,6 +1041,15 @@ export default {
         } 
         // 画布菜单
         else {
+
+            let cells = this.graph.editor.graph.getChildVertices(this.graph.editor.graph.getDefaultParent())
+            if(!_.isEmpty(cells)){
+                menu.addItem('清空', null, ()=>{
+                    this.onCanvasClear();
+                });
+            }
+            menu.addSeparator();
+
             
             let submenuLayout = menu.addItem('布局', null, null);
 
@@ -978,6 +1083,7 @@ export default {
                 this.graph.layout.default = 'circle';
                 this.executeLayout();
             }, submenuLayout);
+
         }
         
     },
@@ -1138,7 +1244,7 @@ export default {
                         return {gid: v.id, name: v.value};
                     });
 
-        this.m3.callFS("/matrix/m3event/graph/graph_imap_data.js", encodeURIComponent(JSON.stringify(cells))).then( rtn=>{
+        this.m3.callFS("/matrix/m3graph/graph_imap_data.js", encodeURIComponent(JSON.stringify(cells))).then( rtn=>{
             
             graph.getModel().beginUpdate();
 
@@ -1257,6 +1363,11 @@ export default {
                 message: "没有该实体 "
             })
         }
+    },
+    // 画布清空
+    onCanvasClear(){
+        this.graph.editor.execute("selectAll");
+        this.graph.editor.execute("delete");
     }
   },
 };
@@ -1265,6 +1376,64 @@ export default {
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
     .el-container{
-        height: calc(100vh - 190px)!important;
+        height: calc(100vh - 50px)!important;
+    }
+</style>
+
+<style>
+    /* mxgraph contextmenu style */
+    td.mxPopupMenuIcon div {
+        width:16px;
+        height:16px;
+    }
+    html div.mxPopupMenu {
+        -webkit-box-shadow:2px 2px 3px #d5d5d5;
+        -moz-box-shadow:2px 2px 3px #d5d5d5;
+        box-shadow:2px 2px 3px #d5d5d5;
+        _filter:progid:DXImageTransform.Microsoft.DropShadow(OffX=2, OffY=2, Color='#d0d0d0', Positive='true');
+        background:white;
+        position:absolute;
+        border:1px solid #e7e7e7;
+        padding:3px;
+    }
+    html table.mxPopupMenu {
+        border-collapse:collapse;
+        margin:0px;
+    }
+    html td.mxPopupMenuItem {
+        padding:7px 30px 7px 30px;
+        font-family: "微软雅黑";/* Microsoft YaHei,Helvetica Neue,Helvetica,Arial Unicode MS,Arial;*/
+        font-size:12px;
+    }
+    html td.mxPopupMenuIcon {
+        background-color:white;
+        padding:0px;
+    }
+    td.mxPopupMenuIcon .geIcon {
+        padding:2px;
+        padding-bottom:4px;
+        margin:2px;
+        border:1px solid transparent;
+        opacity:0.5;
+        _width:26px;
+        _height:26px;
+    }
+    td.mxPopupMenuIcon .geIcon:hover {
+        border:1px solid gray;
+        border-radius:2px;
+        opacity:1;
+    }
+    html tr.mxPopupMenuItemHover {
+        background-color: #f5f5f5;
+        color: black;
+    }
+    table.mxPopupMenu hr {
+        color:#cccccc;
+        background-color:#f5f5f5;
+        border:none;
+        height:1px;
+    }
+    table.mxPopupMenu tr {
+        font-size:4pt;
     }
 </style>
