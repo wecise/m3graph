@@ -1,19 +1,25 @@
 <template>
     <div class="container">
-        <SearchBar ref="searchBarRef"></SearchBar>
-        <GraphHandler :model="model"
+        <SearchBar @graph-data="onSetData" ref="searchBarRef"></SearchBar>
+        <GraphHandler :graphData="graphData" 
+            :global="global"
             @control-show="onControlShow"></GraphHandler>
     </div>
 </template>
 
 <script>
 import GraphHandler from './GraphHandler';
-import SearchBar from './SearchBar';
+import SearchBar from './searchbar/index';
 
 export default {
     name: "Index",
     props: {
-        model: Object
+        global: Object
+    },
+    data(){
+        return {
+            graphData: null
+        }
     },
     components:{
         GraphHandler,
@@ -22,6 +28,9 @@ export default {
     methods:{
         onControlShow(data){
             this.$refs.searchBarRef.control.show = data;
+        },
+        onSetData(data){
+            this.graphData = data;
         }
     }
 }

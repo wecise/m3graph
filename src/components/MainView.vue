@@ -1,6 +1,6 @@
 <template>
 
-  <IndexView></IndexView>
+  <IndexView :global="global"></IndexView>
   
 </template>
 

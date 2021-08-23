@@ -81,7 +81,7 @@ const {mxEditor,mxGraph,mxConstants,mxPanningHandler,mxGraphHandler,mxGuide,mxEd
 export default {
   name: "GraphView",
   props: {
-    model: Array,
+    graphData: Object,
     global: Object
   },
   data() {
@@ -175,11 +175,11 @@ export default {
     };
   },
   watch: {
-        model:{
+        graphData:{
           handler(){
-              //this.initData();
+              this.setGraphData();
           },
-          deep: true
+          immediate: true
         },
         'graph.control.refresh.enable':{
             handler(val){
@@ -203,15 +203,16 @@ export default {
         },
   },
   created(){
-    //this.initData();
     this.init();
   },
   mounted(){
+
+      this.initGraph();
+
       this.eventHub.$on("graph-position",(v)=>{
           this.onCellPosition(v.row,v.hFlag,v.vFlag);
       })
 
-      this.initGraph();
   },
   methods: {
     // 初始化
@@ -238,10 +239,13 @@ export default {
 
     },
     // 加载图数据
-    initData(){
+    setGraphData(){
         
-        if(_.isEmpty(this.model)) {
+        if(_.isEmpty(this.graphData)) {
             return false;
+        } else {
+            this.graph.data = this.graphData;
+            this.onReload();
         }
     },
     // 初始化图板
