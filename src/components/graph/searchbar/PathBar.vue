@@ -54,9 +54,11 @@
 <script>
 
 import _ from 'lodash';
+import toggleBarMixin from '../../mixins/index.js';
 
 export default {
     name: "PathBar",
+    mixins: [toggleBarMixin],
     data(){
         return {
             control: {
@@ -96,11 +98,13 @@ export default {
     },
     filters: {
         pickIcon(item){
-            let icon = item.icon;
-            return `/static/assets/images/entity/png/${icon}.png`;
+            return `/static/assets/images/entity/png/${item.icon}.png`;
         }
     },
     methods: {
+        onToggleBar(){
+            this.control.show = !this.control.show; 
+        },
         onEntityTreeSelected(data){
             this.entity.search.term = data.alias;
             this.onEntitySearch();

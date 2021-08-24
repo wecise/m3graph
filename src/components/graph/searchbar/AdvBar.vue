@@ -12,27 +12,33 @@
                 </el-button>
             </template>
         </el-header>
-        <transition name="fade">
-            <el-main style="width:100%;height:30vh;border-top:1px solid #409EFF;" v-show="control.show">
+        <div v-show="control.show">
+            <el-main style="width:100%;height:30vh;border-top:1px solid #409EFF;">
                 <Editor
-                    v-model="search.term"
+                    v-model="editor.data"
                     @init="onEditorInit"
                     :lang="editor.lang.value"
                     :theme="editor.theme.value"
                     width="100%"
                     height="80%"
-                    style="border:1px solid #f2f2f2;">
+                    style="border:1px solid #f2f2f2;"
+                    ref="editorRef">
                 </Editor>
             </el-main>
-        </transition>
+            <el-footer>
+                <div :loading="search.loading">保存中...</div>
+            </el-footer>
+        </div>
     </el-container>
 </template>
 
 <script>
 import _ from 'lodash';
+import toggleBarMixin from '../../mixins/index.js';
 
 export default {
     name: "AdvBar",
+    mixins: [toggleBarMixin],
     components:{
         Editor:require("vue2-ace-editor"),
     },
@@ -86,12 +92,36 @@ export default {
             return `/static/assets/images/entity/png/${icon}.png`;
         }
     },
+    created(){
+        this.onLoadHistory();
+    },
     methods: {
+        onToggleBar(){
+            this.control.show = !this.control.show; 
+        },
         onEditorInit(){
             require("brace/ext/language_tools"); //language extension prerequsite...
             require(`brace/mode/${this.editor.lang.value}`); //language
             require(`brace/snippets/${this.editor.lang.value}`); //snippet
             require(`brace/theme/${this.editor.theme.value}`); //language
+
+            let editor = this.$refs.editorRef.editor;
+            editor.on('change', _.debounce(()=> {
+                this.onSaveAsHistory();
+            }),1000);
+
+        },
+        onLoadHistory(){
+            let param = encodeURIComponent(JSON.stringify({action:'load',value:null}));
+            this.m3.callFS("/matrix/m3graph/history.js", param).then(res=>{
+                this.editor.data = res.message;
+            })
+        },
+        onSaveAsHistory(){
+            let param = encodeURIComponent(JSON.stringify({action:'save',value: this.editor.data}));
+            this.m3.callFS("/matrix/m3graph/history.js", param).then(res=>{
+                console.log(res)
+            })
         },
         onEntityTreeSelected(data){
             this.search.term = data.alias;
@@ -103,9 +133,13 @@ export default {
         },
         onSearch() {
 
+            let editor = this.$refs.editorRef.editor;
+            this.search.term = editor.getSelectedText() || editor.getValue();
+
             this.search.loading = true;
             
             if(_.isEmpty(this.search.term)){
+                this.search.loading = false;
                 return false;
             }
 

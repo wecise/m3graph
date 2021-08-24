@@ -79,9 +79,12 @@
 <script>
 import ActionView from '../ActionView';
 import _ from 'lodash';
+import toggleBarMixin from '../../mixins/index.js';
+
 
 export default {
     name: "SearchBar",
+    mixins: [toggleBarMixin],
     data(){
         return {
             control: {
@@ -126,6 +129,9 @@ export default {
         ActionView
     },
     methods: {
+        onToggleBar(){
+            this.control.show = !this.control.show; 
+        },
         onEntityTreeSelected(data){
             this.entity.search.term = data.alias;
             this.onEntitySearch();
