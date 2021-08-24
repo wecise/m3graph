@@ -17,7 +17,7 @@
                 <el-button type="text" @click="$emit('toggle-view','SearchBar')">
                     <span class="el-icon-close" style="font-size:14px;font-weight: 900;"></span>
                 </el-button>
-                <el-tooltip content="路劲查询" open-delay="500" placement="top">
+                <el-tooltip content="路劲查询" placement="top">
                     <el-button type="success" class="search" :loading="entity.search.loading">
                         <span class="el-icon-search"></span>
                     </el-button>
@@ -25,28 +25,11 @@
                 
             </template>
         </el-header>
-        <el-main style="width:100%;height:40vh;padding:0px;border-top:1px solid #409EFF;" v-show="searchResultStatus">
-            <div class="div-hover-effect" style="display:flex;padding:10px;cursor:pointer;" 
-                v-for="(item,index) in entity.search.result"
-                :key="index"
-                @click="onEntitySelect(item)"
-                draggable="true" 
-                @dragstart="onEntityDragStart(item,$event)">
-                <el-image :src="item | pickIcon" style="width:15%;height:15%;max-width:48px;min-width:48px;" slot="suffix">
-                    <div slot="error" class="image-slot">
-                        <i class="el-icon-picture-outline"></i>
-                    </div>
-                </el-image>
-                <div style="height:48px;line-height:48px;width:80%;padding-left:10px;">{{ item.value }}</div>
-                <el-tooltip content="拖动到画布">
-                    <el-button type="text" icon="el-icon-menu" style="padding-left:10px;cursor:pointer;"></el-button>
-                </el-tooltip>
-                <el-tooltip content="实体分析">
-                    <el-button type="text" icon="el-icon-postcard" style="padding-left:10px;cursor:pointer;" @click="onEntityDiagnosis(item)">
-                    </el-button>
-                </el-tooltip>
-            </div>
-            <el-button type="text" icon="el-icon-down"></el-button>
+        <el-main class="path-main" v-show="control.show">
+            <PathView class="graphAction" 
+                :model="model" 
+                :pathType="entity.path.type" 
+                ref="pathRef"></PathView>
         </el-main>
     </el-container>
 </template>
@@ -55,12 +38,17 @@
 
 import _ from 'lodash';
 import toggleBarMixin from '../../mixins/index.js';
+import PathView from './path/index';
 
 export default {
     name: "PathBar",
     mixins: [toggleBarMixin],
+    components:{
+        PathView
+    },
     data(){
         return {
+            model: null,
             control: {
                 show: true
             },
@@ -336,6 +324,13 @@ export default {
     .path-bar .search span{
         color: #ffffff;
     }
+
+    .path-bar .path-main{
+        width:100%;
+        height:60vh;
+        padding:0px;
+        border-top:1px solid #409EFF;
+    }
 </style>
 <style>
     .path-bar .el-radio-button__orig-radio:checked+.el-radio-button__inner {
@@ -352,5 +347,55 @@ export default {
 
     .path-bar .el-radio-button:first-child .el-radio-button__inner {
         border-left: unset;
+    }
+
+    .path-bar .el-textarea__inner,
+    .path-bar .el-radio-button__inner{
+        border:unset;
+    }
+    .path-bar .el-radio-button__orig-radio:checked+.el-radio-button__inner {
+        color: #333333;
+        background-color: transparent;
+        border-color: #ffffff;
+        -webkit-box-shadow: unset;
+        box-shadow: unset;
+    }
+    .path-bar .el-radio-button__orig-radio:checked+.el-radio-button__inner:before {
+        content: "";
+        position: absolute;
+        bottom: -2px;
+        left: 29px;
+        border-width: 0 6px 6px;
+        border-style: solid;
+        border-color: #2790e2 transparent;
+        display: block;
+        width: 0;
+        -webkit-transition-duration: 0.3s;
+        transition-duration: 0.3s;
+        -webkit-transition-property: transform;
+        transition-property: transform;
+    }
+    .path-bar .el-radio-button__orig-radio:checked+.el-radio-button__inner:after {
+        content: "";
+        position: absolute;
+        bottom: -2px;
+        left: 30px;
+        border-width: 0 5px 5px;
+        border-style: solid;
+        border-color: #f2f2f2 transparent;
+        display: block;
+        width: 0;
+        -webkit-transition-duration: 0.3s;
+        transition-duration: 0.3s;
+        -webkit-transition-property: transform;
+        transition-property: transform;
+    }
+
+    .path-bar .el-radio-group {
+        display: flex;
+    }
+
+    .path-bar .el-radio-group > .el-radio {
+        margin-right: 20px;
     }
 </style>

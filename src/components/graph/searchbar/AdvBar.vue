@@ -12,23 +12,17 @@
                 </el-button>
             </template>
         </el-header>
-        <div v-show="control.show">
-            <el-main style="width:100%;height:30vh;border-top:1px solid #409EFF;">
-                <Editor
-                    v-model="editor.data"
-                    @init="onEditorInit"
-                    :lang="editor.lang.value"
-                    :theme="editor.theme.value"
-                    width="100%"
-                    height="80%"
-                    style="border:1px solid #f2f2f2;"
-                    ref="editorRef">
-                </Editor>
-            </el-main>
-            <el-footer>
-                <div :loading="search.loading">保存中...</div>
-            </el-footer>
-        </div>
+        <el-main class="adv-main" v-show="control.show">
+            <Editor
+                v-model="editor.data"
+                @init="onEditorInit"
+                :lang="editor.lang.value"
+                :theme="editor.theme.value"
+                width="100%"
+                height="100%"
+                ref="editorRef">
+            </Editor>
+        </el-main>
     </el-container>
 </template>
 
@@ -193,6 +187,12 @@ export default {
     .adv-bar .el-divider__text {
         background-color: transparent;
         color: #777777;
+    }
+
+    .adv-bar .adv-main{
+        width:100%;
+        height:30vh;
+        border-top:1px solid #409EFF;
     }
 </style>
 <style>

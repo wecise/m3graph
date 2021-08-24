@@ -638,7 +638,7 @@ export default {
             };
             
             if(loadSvg()) {
-                _.delay(()=>{
+                setTimeout(()=>{
                     editor.execute("fit");
                     toCenter();
                 },500)
@@ -777,7 +777,9 @@ export default {
 
             this.executeLayout();
 
-            this.onGraphToCenter(true);
+            setTimeout(()=>{
+                this.onGraphToCenter(true);
+            },500)
 
         }
     },
