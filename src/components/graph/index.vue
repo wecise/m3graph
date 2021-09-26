@@ -1,6 +1,6 @@
 <template>
     <div class="container">
-        <Split @onDragEnd="onDragEnd" ref="splitRef">
+        <Split @onDragEnd="onDragEnd" ref="splitRef" style="overflow:hidden;">
             <SplitArea :size="split.sizes[0]" :minSize="0" style="overflow:hidden;">
                 <SearchBar @graph-data="onSetData" ref="searchBarRef"></SearchBar>
                 <GraphHandler :graphData="graphData" 
