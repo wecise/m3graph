@@ -5,7 +5,7 @@
       <SideBar class="sidebar" :auth="auth.signedUser" :global="global"></SideBar>
       <MainView :auth="auth" :global="global" class="content"></MainView>
     </div>
-    <Footer :auth="auth.signedUser" class="footer"></Footer>
+    <Footer :auth="auth" v-if="auth && layout.footer.show"></Footer>
   </div>
 </template>
 
@@ -27,7 +27,18 @@ export default {
   data(){
     return {
       global: null,
-      auth: null
+      auth: null,
+      layout: {
+        header: {
+          show: true
+        },
+        sidebar: {
+          show: true
+        },
+        footer: {
+          show: false
+        }
+      }
     }
   },
   created(){

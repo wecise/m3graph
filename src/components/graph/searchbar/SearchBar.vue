@@ -4,7 +4,6 @@
             <el-button type="text" :icon="controlStatus" @click="control.show=!control.show"></el-button>
             <template v-if="control.show">
                 <el-input v-model="entity.search.term" placeholder="搜索实体、活动关键字" 
-                    @blur="onEntitySearch"
                     @clear="onEntityClear"
                     @keyup.enter.native="onEntitySearch" 
                     clearable autofocus class="input">
@@ -38,7 +37,7 @@
                     </span>
                     <el-dropdown-menu slot="dropdown">
                         <el-dropdown-item @click.native="onFileNew">新建</el-dropdown-item>
-                        <el-dropdown-item @click.native="onFileOpen" divided>打开</el-dropdown-item>
+                        <el-dropdown-item @click.native="dialog.fileOpen.show = true" divided>打开</el-dropdown-item>
                         <el-dropdown-item @click.native="onFileOpenTo">打开到</el-dropdown-item>
                         <el-dropdown-item @click.native="onFileSave" divided>保存</el-dropdown-item>
                         <el-dropdown-item @click.native="onFileSaveAs">另存为</el-dropdown-item>
@@ -73,18 +72,54 @@
             </div>
             <el-button type="text" icon="el-icon-down"></el-button>
         </el-main>
+        <!-- 打开窗口 -->
+        <el-dialog title="打开" 
+                :visible.sync="dialog.fileOpen.show"
+                v-if="dialog.fileOpen.show"
+                :modal-append-to-body="false"
+                modal="false">
+            <DfsOpen dfsRoot="/script/matrix/m3graph/data/graph" ref="dfsOpen"></DfsOpen>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialog.fileOpen.show = false">取 消</el-button>
+                <el-button type="primary" @click="onFileOpen(false)">打 开</el-button>
+            </div>
+        </el-dialog>
+        <!-- 打开到窗口 -->
+        <el-dialog title="打开到" 
+            :visible.sync="dialog.fileOpenTo.show"
+            v-if="dialog.fileOpenTo.show">
+            <DfsOpen dfsRoot="/script/matrix/m3graph/data/graph" ref="dfsOpen"></DfsOpen>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialog.fileOpenTo.show = false">取 消</el-button>
+                <el-button type="primary" @click="onFileOpenTo(false)">打 开 到</el-button>
+            </div>
+        </el-dialog>
+        <!-- 保存窗口 -->
+        <el-dialog title="保存" 
+            :visible.sync="dialog.fileSaveAs.show">
+            <DfsOpen dfsRoot="/script/matrix/m3graph/data/graph" ftype="imap" ref="dfsSaveas"></DfsOpen>
+            <div slot="footer" class="dialog-footer">
+                <el-button @click="dialog.fileSaveAs.show = false">取 消</el-button>
+                <el-button type="primary" @click="onFileSaveAs">保存</el-button>
+            </div>
+        </el-dialog>
     </el-container>
 </template>
 
 <script>
-import ActionView from '../ActionView';
-import _ from 'lodash';
-import toggleBarMixin from '../../mixins/index.js';
+import _isEmpty from 'lodash/isEmpty';
+import _map from 'lodash/map';
+import _extend from 'lodash/extend';
 
+import toggleBarMixin from '../../mixins/index.js';
 
 export default {
     name: "SearchBar",
     mixins: [toggleBarMixin],
+    components:{
+        ActionView: resolve => {require(['../ActionView.vue'], resolve)},
+        DfsOpen: resolve => {require(['../../dfs/DfsOpen.vue'], resolve)}
+    },
     data(){
         return {
             control: {
@@ -97,12 +132,23 @@ export default {
                     result: null
                 },
                 selected: null
+            },
+            dialog: {
+                fileOpen: {
+                    show: false
+                },
+                fileOpenTo: {
+                    show: false
+                },
+                fileSaveAs: {
+                    show: false
+                }
             }
         }
     },
     watch: {
         'entity.search.term':function(val){
-            if(_.isEmpty(val)){
+            if(_isEmpty(val)){
                 this.onEntityClear();
             }
         }
@@ -125,9 +171,6 @@ export default {
             return `/static/assets/images/entity/png/${icon}.png`;
         }
     },
-    components:{
-        ActionView
-    },
     methods: {
         onToggleBar(){
             this.control.show = !this.control.show; 
@@ -144,7 +187,7 @@ export default {
 
             this.entity.search.loading = true;
             
-            if(_.isEmpty(this.entity.search.term)){
+            if(_isEmpty(this.entity.search.term)){
                 return false;
             }
 
@@ -153,7 +196,7 @@ export default {
                 
                 let entitys = rtn.message;
 
-                if(_.isEmpty(entitys)){
+                if(_isEmpty(entitys)){
                     this.$message({
                         type: "info",
                         message: "没有匹配数据！"
@@ -168,8 +211,8 @@ export default {
 
                 this.entity.search.result = entitys;
 
-                this.entity.search.result = _.map(this.entity.search.result,(v)=>{
-                    return _.extend(v,{ cell: {edge:false} } );
+                this.entity.search.result = _map(this.entity.search.result,(v)=>{
+                    return _extend(v,{ cell: {edge:false} } );
                 })
 
                 this.entity.search.loading = false;

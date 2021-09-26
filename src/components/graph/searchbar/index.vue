@@ -6,16 +6,14 @@
 </template>
 
 <script>
-import SearchBar from '../searchbar/SearchBar';
-import PathBar from '../searchbar/PathBar';
-import AdvBar from '../searchbar/AdvBar';
+
 
 export default {
     name: "index",
     components: {
-        SearchBar,
-        PathBar,
-        AdvBar
+        SearchBar: resolve => {require(['../searchbar/SearchBar.vue'], resolve)},
+        PathBar: resolve => {require(['../searchbar/PathBar.vue'], resolve)},
+        AdvBar: resolve => {require(['../searchbar/AdvBar.vue'], resolve)}
     },
     data(){
         return {

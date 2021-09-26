@@ -1060,6 +1060,10 @@ mxSvgCanvas2D.prototype.image = function(x, y, w, h, src, aspect, flipH, flipV)
 	node.setAttribute('width', this.format(w * s.scale));
 	node.setAttribute('height', this.format(h * s.scale));
 	
+	node.onerror = ()=>{
+		node.href.baseVal=this.converter.convert('/static/assets/images/entity/png/matrix.png');
+	}
+	
 	// Workaround for missing namespace support
 	if (node.setAttributeNS == null)
 	{

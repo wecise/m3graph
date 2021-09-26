@@ -1,6 +1,6 @@
 <template>
 
-  <el-container ref="container">
+  <el-container ref="container" style="position:relative;" class="container">
     <el-header style="height:40px;line-height:40px;padding:0px;text-align:right;">
         <el-popover
             placement="left"
@@ -49,7 +49,19 @@
                         <el-tab-pane label="边线" name="edge">
                             <el-form>
                                 <el-form-item label="样式">
-                                    
+                                    <el-select v-model="graph.style.edge.value" 
+                                            placeholder="请选择" 
+                                            @change="onEdgeStyleChange">
+                                        <el-option :key="item.name" :value="item" 
+                                            :label="item.name" v-for="item in graph.style.edge.list">
+                                            <div style="display: flex;">
+                                                <el-image
+                                                    style="width: 32px; height: 32px"
+                                                    :src="item | pickLineStyleImage"></el-image>
+                                                <span>{{ item.cnTitle }}</span>
+                                            </div>
+                                        </el-option>
+                                    </el-select>
                                 </el-form-item>
                             </el-form>
                         </el-tab-pane>
@@ -60,11 +72,57 @@
                 <i class="el-icon-setting" style="font-size:15px;margin:0 5px;"></i>
             </el-button>
         </el-popover>
+
     </el-header>
-    <el-main id="graphContainer" ref="graphContainer" style="width:100vw;height:100vh;min-width:100vw;position:releative;overflow:hidden;padding:0px;"></el-main>
-    <div ref="outlineContainer"
-        style="position:absolute;overflow:hidden;top:40px;right:20px;width:200px;height:140px;background:transparent;box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);"
-        v-show="graph.control.outline.show">
+    <el-main ref="graphContainer" 
+        style="width:100%;height:100vh;min-width:100%;position:releative;overflow:hidden;padding:0px;">
+    </el-main>
+    <div class="outlineContainer" draggable="true" v-show="graph.control.outline.show">
+        <el-card class="box-card">
+            <div ref="outlineContainer"></div>
+        </el-card> 
+    </div>
+    <div class="vertical-toolbar animated fadeIn" v-show="graph.control.toolbar.show">
+        <el-tooltip content="撤销" placement="left">
+            <el-button type="text"  @click="graph.editor.execute('undo');">
+                <i class="el-icon-refresh-left" style="font-size:18px;"></i>
+            </el-button>
+        </el-tooltip>
+        <el-divider></el-divider>
+        <el-tooltip content="放大" placement="left">
+            <el-button type="text"  @click="onZoomIn">
+                <i class="el-icon-zoom-in" style="font-size:18px;"></i>
+            </el-button>
+        </el-tooltip>
+        <el-divider></el-divider>
+        <el-tooltip content="缩小" placement="left">
+            <el-button type="text"  @click="onZoomOut">
+                <i class="el-icon-zoom-out" style="font-size:18px;"></i>
+            </el-button>
+        </el-tooltip>
+        <el-divider></el-divider>
+        <el-tooltip content="将图居中显示" placement="left">
+            <el-button type="text"  @click="onCenter">
+                <i class="el-icon-rank" style="font-size:18px;"></i>
+            </el-button>
+        </el-tooltip>
+        <el-divider></el-divider>
+        <el-tooltip content="节点渲染模式" placement="left">
+            <el-button type="text" :icon="graph.control.ifIcon | pickIconStyle" @click="onToggleIcon" style="width:18px;height:auto;">
+            </el-button>
+        </el-tooltip>
+        <el-divider></el-divider>
+        <el-tooltip content="全屏显示" placement="left">
+            <el-button type="text" :icon="graph.control.ifFullScreen | pickScreenStyle" 
+                    @click="onFullScreen" style="width:18px;height:auto;">
+            </el-button>
+        </el-tooltip>
+        <el-divider></el-divider>
+        <el-tooltip content="打印" placement="left">
+            <el-button type="text"  @click="onPrint">
+                <i class="el-icon-printer" style="font-size:18px;"></i>
+            </el-button>
+        </el-tooltip>
     </div>
   </el-container>
 
@@ -76,7 +134,7 @@ import 'mxgraph/javascript/src/css/common.css';
 import _ from 'lodash';
 import $ from 'jquery';
 import mxgraph from './mxGraph.js';
-const {mxEditor,mxGraph,mxConstants,mxPanningHandler,mxGraphHandler,mxGuide,mxEdgeHandler,mxClient,mxRectangleShape,mxRubberband,mxCellOverlay,mxOutline,mxImage,mxPoint,mxEdgeStyle,mxCellTracker,mxUtils,mxCodec,mxEvent,mxHierarchicalLayout,mxMorphing,mxFastOrganicLayout,mxCompactTreeLayout,mxCircleLayout} = mxgraph;
+const {mxEditor,mxPrintPreview,mxGraph,mxConstants,mxPanningHandler,mxGraphHandler,mxGuide,mxEdgeHandler,mxClient,mxRectangleShape,mxRubberband,mxCellOverlay,mxOutline,mxImage,mxPoint,mxEdgeStyle,mxCellTracker,mxUtils,mxCodec,mxEvent,mxHierarchicalLayout,mxMorphing,mxFastOrganicLayout,mxCompactTreeLayout,mxCircleLayout} = mxgraph;
 
 export default {
   name: "GraphView",
@@ -99,13 +157,14 @@ export default {
                     inst: null
                 },
                 toolbar:{
-                    show: false
+                    show: true
                 },
                 refresh:{
                     inst: null,
                     enable: false,
                     interval: 15*1000
-                }
+                },
+                ifFullScreen: false
             },
             layout: {
                 default: 'hierarchical_vertical'
@@ -202,6 +261,29 @@ export default {
             immediate:true
         },
   },
+  filters:{
+      pickLineStyleImage(item){
+        try{
+            return `/static/assets/images/graph/tools/line/${item.name}.png`;
+        } catch(err){
+            return `/static/assets/images/graph/tools/line/straight.png`;
+        }
+    },
+    pickScreenStyle(evt){
+        if(evt){
+            return `el-icon-full-screen`;
+        } else {
+            return `el-icon-copy-document`;
+        }
+    },
+    pickIconStyle(evt){
+        if(evt){
+            return `el-icon-picture-outline`;
+        } else {
+            return `el-icon-s-help`;
+        }
+    }
+  },
   created(){
     this.init();
   },
@@ -217,9 +299,17 @@ export default {
   methods: {
     // 初始化
     init(){
-        this.m3.callFS("/matrix/m3graph/edges.js",null).then( (rtn)=>{
+
+        this.eventHub.$on("window-resize",()=>{
+            this.onCenter();
+        });
+
+        this.m3.callFS("/matrix/m3npclink/edges.js",null).then( (rtn)=>{
             this.graph.edges.list = rtn.message;
         } );
+
+        // 节点渲染方式
+        this.graph.control.ifIcon = (localStorage.getItem("GRAPH-RENDER-TYPE"))=='true'?true:false;
 
         // 状态刷新标志
         this.graph.control.refresh.enable = (localStorage.getItem("GRAPH-STATUS-IFREFRESH") == 'true');
@@ -441,14 +531,14 @@ export default {
     },
     // 滚轮缩放事件监听
     addScrollListener(graph){
-        var t = (function a(element, wheelHandle) {
+        let t = (function a(element, wheelHandle) {
                 if (typeof element != 'object') return;
                 if (typeof wheelHandle != 'function') return;
 
                 // 监测浏览器
                 if (typeof a.browser == 'undefined') {
-                    var user = navigator.userAgent;
-                    var b = {};
+                    let user = navigator.userAgent;
+                    let b = {};
                     b.opera = user.indexOf("Opera") > -1 && typeof window.opera == "object";
                     b.khtml = (user.indexOf("KHTML") > -1 || user.indexOf("AppleWebKit") > -1 || user.indexOf("Konqueror") > -1) && !b.opera;
                     b.ie = user.indexOf("MSIE") > -1 && !b.opera;
@@ -488,9 +578,151 @@ export default {
             e.stopPropagation();
         }
     },
+    // 全屏显示
+    onFullScreen(){
+        let screenfull = require("screenfull");
+        if (screenfull.isEnabled) {
+            if(this.graph.control.ifFullScreen){
+                screenfull.exit();
+            } else {
+                screenfull.request();
+            }
+            this.graph.control.ifFullScreen = !this.graph.control.ifFullScreen;
+        }
+    },
+    // 图放大
+    onZoomIn(){
+        this.graph.editor.graph.zoomIn();
+    },
+    // 图缩小
+    onZoomOut(){
+        this.graph.editor.graph.zoomOut();
+    },
+    // 图自适应大小
+    onFit(){
+        this.graph.editor.execute("fit");
+    },
+    // 图自适应并居中显示
+    onCenter(immediate){
+        let editor = this.graph.editor;
+        let graph = editor.graph;
+        let parent = graph.getDefaultParent();
+        let limit = 20;  // 当前画布节点数量阈值
+        let topCell = graph.findTreeRoots(parent)[0];
+        
+        // 获取当前选择节点 
+        // 针对加载子图的场景
+        // 最顶层节点  graph.center(true,true,0,0.5);
+        // 子节点  graph.center(true,true,0.5,0.5);
+        let toCenter = ()=>{
+            let selectionCell = graph.getSelectionCell();
+            let allCells = graph.getChildVertices(parent);
+            
+            if( allCells.length > limit){
+                // 图自适应
+                editor.execute("fit");
+                //editor.execute("actualSize"); 
+            } else {
+                // 图实际大小
+                //editor.execute("actualSize"); 
+            }
+
+            // 没有选择节点
+            if( selectionCell == null ){
+                
+                graph.center(true,true,0.5,0.5);  // middle-center
+
+            } else {
+                
+                // 选择了最顶层节点
+                if( selectionCell == topCell ){
+                    graph.center(true,true,0,0.5); // top-center
+                    // 定位选择节点
+                    self.onPosition(selectionCell.getId(), true, true);
+                } 
+                // 选择了子节点
+                else {
+                    graph.center(true,true,0.5,0.5);  // middle-center
+                    // 定位选择节点
+                    this.onPosition(selectionCell.getId(), true, true);
+                }
+            }
+            
+        }
+
+        if(immediate){
+            editor.execute("fit");
+            toCenter();
+        } else {
+            let loadSvg = function(){
+                try{
+                    let rtn = graph.getChildEdges(parent);
+                    
+                    if(_.size(rtn) > 0){
+                        return true;
+                    } else {
+                        return false;
+                    }
+                    
+                } catch(err){
+                    return false
+                }
+            };
+            
+            if(loadSvg()) {
+                _.delay(()=>{
+                    editor.execute("fit");
+                    toCenter();
+                },500)
+            } else {
+                setTimeout(loadSvg, 50);
+            }   
+        }
+    },
+    // 图打印
+    onPrint(){
+        let scale = mxUtils.getScaleForPageCount(1, this.graph.editor.graph);
+        let preview = new mxPrintPreview(this.graph.editor.graph, scale);
+        preview.open();
+    },
+    // 切换节点渲染类型 图标 or 图形
+    onToggleIcon(){
+        
+        this.graph.control.ifIcon = !this.graph.control.ifIcon;
+
+        try{
+            let parent = this.graph.editor.graph.getDefaultParent();
+            let vertices = this.graph.editor.graph.getChildVertices(parent);
+            
+            _.forEach(vertices, (v)=>{
+                let type = _.head(v.id.split(":")) || 'matrix';
+                let imageUrl = this.imageRenderHandler(type);
+                
+                // 图标
+                if(this.graph.control.ifIcon){
+                    if(this.checkImgExists(`${type}.png`)){
+                        this.graph.editor.graph.getModel().setStyle(v,`shape=image;html=1;image=${imageUrl};verticalLabelPosition=bottom;verticalAlign=top;`)
+                    } else {
+                        this.graph.editor.graph.getModel().setStyle(v,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
+                    }    
+                } 
+                // 图形
+                else {
+                    this.graph.editor.graph.getModel().setStyle(v,`shape=ellipse;perimeter=ellipsePerimeter;html=1;labelPosition=center;verticalLabelPosition=bottom;align=center;verticalAlign=middle;`);
+                }
+                
+            })
+            
+        } catch(err){
+            console.log(err)
+        } finally{
+            localStorage.setItem("GRAPH-RENDER-TYPE",this.graph.control.ifIcon);
+        }
+
+    },
     checkImgExists(){
         //let term = {parent:"/assets/images/entity/png", name:name};
-        return true;//fsHandler.callFsJScript("/matrix/m3graph/checkHaveFile.js", encodeURIComponent(JSON.stringify(term))).message;
+        return true;//fsHandler.callFsJScript("/matrix/m3npclink/checkHaveFile.js", encodeURIComponent(JSON.stringify(term))).message;
     },  
     // 渲染图片来源
     imageRenderHandler(icon) {
@@ -502,6 +734,55 @@ export default {
         }
 
     },
+    // 边样式调整
+    onEdgeStyleChange(evt){
+        
+        let keys = evt.keys;
+        let values = evt.values;
+        let graph = this.graph.editor.graph;
+        
+        graph.stopEditing(false);
+        
+        graph.getModel().beginUpdate();
+        try{
+            
+            graph.selectEdges();
+
+            let cells = graph.getSelectionCells();
+
+            let edges = [];
+
+            for (var i = 0; i < cells.length; i++){
+                var cell = cells[i];
+                
+                if (graph.getModel().isEdge(cell)){
+                    
+                    var geo = graph.getCellGeometry(cell);
+        
+                    // Resets all edge points
+                    if (geo != null){
+                        geo = geo.clone();
+                        geo.points = null;
+                        graph.getModel().setGeometry(cell, geo);
+                    }
+                    
+                    for (var j = 0; j < keys.length; j++){
+                        graph.setCellStyles(keys[j], values[j], [cell]);
+                    }
+                    
+                    edges.push(cell);
+                }
+            }
+
+            graph.clearSelection();
+            
+        }
+        finally{
+            graph.getModel().endUpdate();
+        }
+    
+    },
+    
     // 切换预览
     onInitOutline(graph){
         new mxOutline(graph, this.$refs.outlineContainer);
@@ -545,8 +826,8 @@ export default {
 
             _.delay(()=>{
                 let state = graph.view.getState(cell);
-                
-                if(this.model.control.ifIcon){
+                    
+                if(this.graph.control.ifIcon){
                     state.shape.node.getElementsByTagName("image")[0].setAttribute('class', 'animated flash');
                 } else {
                     state.shape.node.getElementsByTagName("ellipse")[0].setAttribute('class', 'animated flash');
@@ -911,7 +1192,7 @@ export default {
             term = `match ('${node.node.id}') <- [${edgeStr}*${node.step}] - ()`;
         }
 
-        this.m3.callFS("/matrix/m3graph/graphService.js", encodeURIComponent(term)).then( res=>{
+        this.m3.callFS("/matrix/m3npclink/graphService.js", encodeURIComponent(term)).then( res=>{
             
             let rtn = res.message[0].graph;
             console.log(1111,rtn)
@@ -955,15 +1236,15 @@ export default {
 
                 let node = {id: id, value: value, type:'event', cell: cell};
 
-                /* menu.addItem('实体分析', null, ()=>{
-                    
-                }); */
+                menu.addItem('实体分析', null, ()=>{
+                    this.$emit("entity-search",node);
+                });
 
                 /* menu.addItem('实体删除', null, ()=>{
                     this.removeEntityHandler(cell);
                 }); */
 
-                // menu.addSeparator();
+                menu.addSeparator();
                 
                 menu.addItem('节点删除', null, ()=>{
                     this.onDeleteSelectedCells(graph,evt != null && mxEvent.isShiftDown(evt));
@@ -972,7 +1253,7 @@ export default {
                 let vars = {};
                 let submenuBsearch = null;
                 let submenuEsearch = null;
-                this.m3.callFS("/matrix/m3graph/getEdgesByClass.js",encodeURIComponent(id)).then(rtn=>{
+                this.m3.callFS("/matrix/m3npclink/getEdgesByClass.js",encodeURIComponent(id)).then(rtn=>{
                     
                     menu.addSeparator();
 
@@ -1053,9 +1334,8 @@ export default {
                 menu.addItem('清空', null, ()=>{
                     this.onCanvasClear();
                 });
+                menu.addSeparator();
             }
-            menu.addSeparator();
-
             
             let submenuLayout = menu.addItem('布局', null, null);
 
@@ -1250,7 +1530,7 @@ export default {
                         return {gid: v.id, name: v.value};
                     });
 
-        this.m3.callFS("/matrix/m3graph/graph_imap_data.js", encodeURIComponent(JSON.stringify(cells))).then( rtn=>{
+        this.m3.callFS("/matrix/m3npclink/graph_imap_data.js", encodeURIComponent(JSON.stringify(cells))).then( rtn=>{
             
             graph.getModel().beginUpdate();
 
@@ -1381,12 +1661,46 @@ export default {
 
 <!-- Add "scoped" attribute to limit CSS to this component only -->
 <style scoped>
-    .el-container{
+    .container.el-container{
         height: calc(100vh - 50px)!important;
+    }
+    .vertical-toolbar{
+        position: absolute;
+        width: 29px;
+        height: auto;
+        background: #ffffff;
+        z-index: 1000;
+        right: 10px;
+        bottom: 10px;
+        -webkit-transform: translateZ(0);
+        transform: translateZ(0);
+        box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+        border-radius: 8px;
+        padding: 0px 6px;
+    }
+    .vertical-toolbar > button{
+        margin: 0 5px;
+    }
+    .vertical-toolbar > .el-dropdown,
+    .vertical-toolbar > .el-color-picker{
+        margin: 5px;
+    }
+    .vertical-toolbar > .el-divider--horizontal {
+        margin: 5px 0;
     }
 </style>
 
 <style>
+    .outlineContainer{
+        position:absolute;
+        overflow:hidden;
+        top:30px;
+        right:10px;
+        width:200px;
+        height:140px;
+        background:transparent;
+        box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    }
     /* mxgraph contextmenu style */
     td.mxPopupMenuIcon div {
         width:16px;
