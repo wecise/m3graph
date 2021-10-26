@@ -53,7 +53,5 @@ if(process.env.NODE_ENV === "development"){
   
 } else {
   m3.init();
-  setTimeout(()=>{
-    init();
-  },1000)
+  init();
 }
